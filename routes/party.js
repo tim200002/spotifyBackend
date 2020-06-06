@@ -1,0 +1,114 @@
+//Important for Environmet Variables -> when not in Production load important variables from file
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config();
+}
+
+var express = require('express');
+var router = express.Router();
+const { Party } = require('../models/party')
+const { User } = require('../models/user')
+
+//Return all The Information about a Party
+router.get('/', async (req, res) => {
+    var party = await Party.findById(req.query.partyId)
+    res.send({
+        playlist: party.playlist
+    })
+}
+);
+
+//Create a Party a valid user Id must exist
+router.post('/', async (req, res) => {
+    var user = await User.findById(req.body._id)
+    var party = new Party({
+        name: req.body.name,
+        //Create unique party Id later
+        Playlist: [],
+        user: req.body._id
+    })
+    party = await party.save()
+    //Make sure there is a party array
+    user.parties ? !null : user.parties = []
+    user.parties.push({
+        id: party._id,
+        isAdmin: true
+    })
+    user = await user.save()
+
+    res.send({
+        playlist: party.playlist
+    })
+}
+);
+
+
+//Vote either new song or not
+//Sorts List after and returns sorted List
+router.post('/vote', async (req, res) => {
+    console.log(req.body)
+    var party = await Party.findById(req.body.id)
+    if(!party) return res.status(400).send("Party not found")
+    //Does Playlist contain Song
+    for (var i = 0; i < party.playlist.length; i++) {
+        if (party.playlist[i].id == req.body.songId) {
+            party.playlist[i].votes++
+            //Sort
+            var first = party.playlist[0]
+            var rest= party.playlist.slice(1)
+            //Sort Rest:
+            rest.sort((a,b)=>b.votes-a.votes)
+            console.log(rest)
+            party.playlist=[first].concat(rest)
+            party = await party.save();
+            res.send(party.playlist) //
+            return
+        }
+    }
+    //Song not found add
+    party.playlist.push({
+        id: req.body.songId,
+        artist: req.body.artist,
+        title: req.body.title,
+        albumArt: req.body.albumArt,
+        votes: 1
+    })
+    await party.save()
+    res.send(party.playlist)
+})
+
+//If user has right Skip to next Track
+router.get('/skip', async (req,res)=>{
+    var party = await Party.findById(req.query.partyId)
+    //Not thre right to skip
+    if (req.query._id!=party.user){
+        return res.status(401).send("You are not authorized to Skip a Track")
+    }
+
+    //All Good
+    if(party.playlist != null && party.playlist.length>0){
+        party.playlist=party.playlist.slice(1)
+        party=await party.save();
+        return res.send(party.playlist[0])
+    }
+    return res.status(400) //Not sure if Status right
+})
+
+//Returns Object of all the Parties from a user and if he is admin
+//Return all The Information about a Party
+router.get('/myParties', async (req, res) => {
+    var user = await User.findById(req.query._id)
+    if(!user) return res.status(401).send("User Not Found")
+    var subscribedParties = []
+    for(var i=0; i<user.parties.length; i++){
+        var party = await Party.findById(user.parties[i].id)
+        subscribedParties.push({
+            name: party.name,
+            isAdmin: user.parties[i].isAdmin,
+            partyId: user.parties[i].id
+        })
+    }
+    res.send(subscribedParties)
+}
+);
+
+module.exports = router
