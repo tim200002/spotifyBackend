@@ -27,7 +27,9 @@ const PartyScheme =new mongoose.Schema({
     user:{
         type: ObjectId,
         ref: "User"
-    }
+    },
+    socketId: String,
+    deviceId: String
 
 })
 const Party = mongoose.model('Party', PartyScheme)

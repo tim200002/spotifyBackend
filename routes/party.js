@@ -8,6 +8,14 @@ var router = express.Router();
 const { Party } = require('../models/party')
 const { User } = require('../models/user')
 
+var NewSpotifyApi=require('../Classes/newSpotifyApi')
+var newSpotifyApi= new NewSpotifyApi(
+    process.env.client_Id,
+    process.env.client_secret_key,
+    process.env.redirect_uri
+)
+
+
 //Return all The Information about a Party
 router.get('/', async (req, res) => {
     var party = await Party.findById(req.query.partyId)
@@ -79,7 +87,7 @@ router.post('/vote', async (req, res) => {
 //If user has right Skip to next Track
 router.get('/skip', async (req,res)=>{
     var party = await Party.findById(req.query.partyId)
-    //Not thre right to skip
+    //Not the right to skip
     if (req.query._id!=party.user){
         return res.status(401).send("You are not authorized to Skip a Track")
     }
@@ -93,6 +101,48 @@ router.get('/skip', async (req,res)=>{
     return res.status(400) //Not sure if Status right
 })
 
+//Toggle
+router.get('/toggle', async (req,res)=>{
+    var party = await Party.findById(req.query.partyId)
+    var user = await User.findById(party.user)
+    var accessToken = await user.isAccessValid()
+    //Not the right to Toogle
+    if (req.query._id!=party.user){
+        return res.status(401).send("You are not authorized to Toogle Playbak")
+    }
+  
+    //All Good
+    var currentPlaying = await newSpotifyApi.getCurrentTrack(accessToken)
+
+    //No track to play
+    if(party.playlist.length == 0) return res.send("No Tracks to Play")
+    
+    //No current Playback -> start Playback
+    if(currentPlaying == ""){
+        newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
+        return res.send("Started Song")
+    }
+    //There is current Playback
+
+    //First check if current Track matches first in que -> not play
+    if(currentPlaying.item.id != party.playlist[0].id){
+        newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
+
+        return res.send("All Good")
+    }
+    //Else is pause -> play or isplaying -> pause
+    else{
+        if(currentPlaying.is_playing){
+            newSpotifyApi.pause(accessToken, party.deviceId)
+            res.send("paused")
+        }
+        else{
+            newSpotifyApi.resume(accessToken, party.deviceId)
+            res.send("resumed")
+        }
+    }
+
+})
 //Returns Object of all the Parties from a user and if he is admin
 //Return all The Information about a Party
 router.get('/myParties', async (req, res) => {
@@ -111,4 +161,11 @@ router.get('/myParties', async (req, res) => {
 }
 );
 
+router.get('/accessToken',async (req,res)=>{
+    var party = await Party.findById(req.query.partyId)
+    var user = await User.findById(party.user)
+    var accessToken = await user.isAccessValid()
+    console.log("Acces Token"+ accessToken)
+    res.send({accessToken: accessToken})
+})
 module.exports = router

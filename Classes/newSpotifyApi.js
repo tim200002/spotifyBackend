@@ -117,6 +117,7 @@ class NewSpotifyApi {
             axios.post(`https://api.spotify.com/v1/users/${userId}/playlists`, reqBody, config)
                 .then((result) => {
                     resolve(result.data);
+
                 })
                 .catch((err) => {
                     console.log(err.message);
@@ -174,6 +175,88 @@ class NewSpotifyApi {
                 })
         }
         );
+    }
+
+    play(accessToken, deviceId, songId){
+        const config = {
+            headers:{
+                'Authorization': "Bearer " + accessToken,
+            },
+            params:{
+                device_id: deviceId
+            }
+        }
+
+        const reqBody = {
+            uris:[`spotify:track:${songId}`]
+        }
+
+        return new Promise((resolve, reject)=>{
+            axios.put("https://api.spotify.com/v1/me/player/play", reqBody, config)
+            .then((result)=>{
+                resolve("Succes Playing Song")
+            })
+            .catch((err)=>{
+                console.log(err.message)
+                reject("Error Playing Song")
+            })
+        })
+    }
+    resume(accessToken, deviceId){
+        const config = {
+            headers:{
+                'Authorization': "Bearer " + accessToken,
+            },
+            params:{
+                device_id: deviceId
+            }
+        }
+            axios.put("https://api.spotify.com/v1/me/player/play", {},config)
+            .then((result)=>{
+                console.log("Succes Resuming Song")
+            })
+            .catch((err)=>{
+                console.log(err.message)
+                console.log("Error Resuming Song")
+            })
+    }
+
+    pause(accessToken, deviceId){
+        const config = {
+            headers:{
+                'Authorization': "Bearer " + accessToken,
+            },
+    
+        }
+
+        console.log(deviceId)
+
+        //I belive no need for async
+        axios.put("https://api.spotify.com/v1/me/player/pause?device_id="+deviceId, {}, config)
+        .then((result)=>{
+            console.log("paused Track")
+        })
+        .catch((err)=>{
+            console.log("Error Pausing")
+        })
+    }
+
+    getCurrentTrack(accessToken){
+        const config ={
+            headers:{
+                'Authorization': "Bearer " + accessToken,
+            },
+        }
+
+        return new Promise((resolve, rejcet)=>{
+            axios.get("https://api.spotify.com/v1/me/player/currently-playing", config)
+            .then((result)=>{
+                resolve(result.data)
+            })
+            .catch((err)=>{
+                reject("Couldnt get current Track")
+            })
+        })
     }
 }
 

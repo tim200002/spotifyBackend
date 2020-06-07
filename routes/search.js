@@ -27,7 +27,7 @@ router.post('/', async(req,res)=>{
         var result=[]
         tracks.forEach((item)=>{result.push({
             artist: item.artists[0].name,
-            id: item.id,
+            songId: item.id,
             title: item.name,
             albumArt:item.album.images[2].url //Not Sure index 1 or 2 1 is bigger
         })})
