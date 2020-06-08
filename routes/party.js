@@ -8,8 +8,10 @@ var router = express.Router();
 const { Party } = require('../models/party')
 const { User } = require('../models/user')
 
-var NewSpotifyApi=require('../Classes/newSpotifyApi')
-var newSpotifyApi= new NewSpotifyApi(
+const eventBus = require('../eventBus')
+
+var NewSpotifyApi = require('../Classes/newSpotifyApi')
+var newSpotifyApi = new NewSpotifyApi(
     process.env.client_Id,
     process.env.client_secret_key,
     process.env.redirect_uri
@@ -19,9 +21,17 @@ var newSpotifyApi= new NewSpotifyApi(
 //Return all The Information about a Party
 router.get('/', async (req, res) => {
     var party = await Party.findById(req.query.partyId)
-    res.send({
-        playlist: party.playlist
+    var result = []
+    party.playlist.forEach((item) => {
+        result.push({
+            artist: item.artist,
+            songId: item.id,
+            title: item.title,
+            albumArt: item.albumArt
+        })
     })
+    //console.log(result)
+    res.send(result )
 }
 );
 
@@ -55,20 +65,21 @@ router.post('/', async (req, res) => {
 router.post('/vote', async (req, res) => {
     console.log(req.body)
     var party = await Party.findById(req.body.id)
-    if(!party) return res.status(400).send("Party not found")
+    if (!party) return res.status(400).send("Party not found")
     //Does Playlist contain Song
     for (var i = 0; i < party.playlist.length; i++) {
         if (party.playlist[i].id == req.body.songId) {
             party.playlist[i].votes++
             //Sort
             var first = party.playlist[0]
-            var rest= party.playlist.slice(1)
+            var rest = party.playlist.slice(1)
             //Sort Rest:
-            rest.sort((a,b)=>b.votes-a.votes)
+            rest.sort((a, b) => b.votes - a.votes)
             console.log(rest)
-            party.playlist=[first].concat(rest)
+            party.playlist = [first].concat(rest)
             party = await party.save();
             res.send(party.playlist) //
+            eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId:party._id })
             return
         }
     }
@@ -81,62 +92,71 @@ router.post('/vote', async (req, res) => {
         votes: 1
     })
     await party.save()
+    eventBus.emit("voted", { socketId: party.socketId, playlist: party.playlist ,partyId:party._id })
     res.send(party.playlist)
 })
 
+
 //If user has right Skip to next Track
-router.get('/skip', async (req,res)=>{
+router.get('/skip', async (req, res) => {
     var party = await Party.findById(req.query.partyId)
     //Not the right to skip
-    if (req.query._id!=party.user){
+    if (req.query._id != party.user) {
         return res.status(401).send("You are not authorized to Skip a Track")
     }
 
     //All Good
-    if(party.playlist != null && party.playlist.length>0){
-        party.playlist=party.playlist.slice(1)
-        party=await party.save();
+    if (party.playlist != null && party.playlist.length > 0) {
+        party.playlist = party.playlist.slice(1)
+        party = await party.save();
+        //! Call Spotify Api to Skip by playing next song
+        const user = await User.findById(party.user)
+        console.log(user)
+        const accessToken = await user.isAccessValid()
+        console.log("Skipped")
+        newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id) //We dont need to fire an event does it automatically
+        eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId:party._id })
         return res.send(party.playlist[0])
     }
     return res.status(400) //Not sure if Status right
 })
 
 //Toggle
-router.get('/toggle', async (req,res)=>{
+router.get('/toggle', async (req, res) => {
     var party = await Party.findById(req.query.partyId)
     var user = await User.findById(party.user)
     var accessToken = await user.isAccessValid()
     //Not the right to Toogle
-    if (req.query._id!=party.user){
+    if (req.query._id != party.user) {
         return res.status(401).send("You are not authorized to Toogle Playbak")
     }
-  
+
     //All Good
     var currentPlaying = await newSpotifyApi.getCurrentTrack(accessToken)
 
     //No track to play
-    if(party.playlist.length == 0) return res.send("No Tracks to Play")
-    
+    if (party.playlist.length == 0) return res.send("No Tracks to Play")
+
     //No current Playback -> start Playback
-    if(currentPlaying == ""){
+    if (currentPlaying == "") {
         newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
         return res.send("Started Song")
     }
     //There is current Playback
 
     //First check if current Track matches first in que -> not play
-    if(currentPlaying.item.id != party.playlist[0].id){
+    if (currentPlaying.item.id != party.playlist[0].id) {
         newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
 
         return res.send("All Good")
     }
     //Else is pause -> play or isplaying -> pause
-    else{
-        if(currentPlaying.is_playing){
+    else {
+        if (currentPlaying.is_playing) {
             newSpotifyApi.pause(accessToken, party.deviceId)
             res.send("paused")
         }
-        else{
+        else {
             newSpotifyApi.resume(accessToken, party.deviceId)
             res.send("resumed")
         }
@@ -147,9 +167,9 @@ router.get('/toggle', async (req,res)=>{
 //Return all The Information about a Party
 router.get('/myParties', async (req, res) => {
     var user = await User.findById(req.query._id)
-    if(!user) return res.status(401).send("User Not Found")
+    if (!user) return res.status(401).send("User Not Found")
     var subscribedParties = []
-    for(var i=0; i<user.parties.length; i++){
+    for (var i = 0; i < user.parties.length; i++) {
         var party = await Party.findById(user.parties[i].id)
         subscribedParties.push({
             name: party.name,
@@ -161,11 +181,11 @@ router.get('/myParties', async (req, res) => {
 }
 );
 
-router.get('/accessToken',async (req,res)=>{
+router.get('/accessToken', async (req, res) => {
     var party = await Party.findById(req.query.partyId)
     var user = await User.findById(party.user)
     var accessToken = await user.isAccessValid()
-    console.log("Acces Token"+ accessToken)
-    res.send({accessToken: accessToken})
+    console.log("Acces Token" + accessToken)
+    res.send({ accessToken: accessToken })
 })
 module.exports = router
