@@ -166,6 +166,7 @@ router.get('/toggle', async (req, res) => {
 //Returns Object of all the Parties from a user and if he is admin
 //Return all The Information about a Party
 router.get('/myParties', async (req, res) => {
+    console.log("User Aked for his Parties")
     var user = await User.findById(req.query._id)
     if (!user) return res.status(401).send("User Not Found")
     var subscribedParties = []
@@ -177,6 +178,7 @@ router.get('/myParties', async (req, res) => {
             partyId: user.parties[i].id
         })
     }
+    console.log(subscribedParties)
     res.send(subscribedParties)
 }
 );
