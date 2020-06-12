@@ -29,7 +29,7 @@ router.post('/', async(req,res)=>{
             artist: item.artists[0].name,
             songId: item.id,
             title: item.name,
-            albumArt:item.album.images[2].url //Not Sure index 1 or 2 1 is bigger
+            albumArt:item.album.images[1].url //Not Sure index 1 or 2 1 is bigger
         })})
         res.send(result);
         }

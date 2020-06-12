@@ -20,23 +20,74 @@ var newSpotifyApi = new NewSpotifyApi(
 
 //Return all The Information about a Party
 router.get('/', async (req, res) => {
-    var party = await Party.findById(req.query.partyId)
-    var result = []
-    party.playlist.forEach((item) => {
-        result.push({
-            artist: item.artist,
-            songId: item.id,
-            title: item.title,
-            albumArt: item.albumArt
+    try {
+        var party = await Party.findById(req.query.partyId)
+        if (!party) return res.status(400).send("Couldnt find Party")
+        console.log(party)
+        var result = []
+        party.playlist.forEach((item) => {
+            result.push({
+                artist: item.artist,
+                songId: item.id,
+                title: item.title,
+                albumArt: item.albumArt
+            })
         })
-    })
-    //console.log(result)
-    res.send(result )
+        //console.log(result)
+        res.send(result)
+    }
+    catch (err) {
+        res.status(400).send(err.message)
+    }
 }
+
 );
+
+//Join a Party
+router.post("/join", async (req, res) => {
+    try {
+        console.log("User wants to join a Party for the First Time")
+        var party = await Party.findById(req.body.partyId)
+        if (!party) return res.status(400).send("Couldnt find Party")
+
+        var user = await User.findById(req.body._id)
+        if (!user) return res.status(400).send("Couldnt find User")
+        if (user.parties == null) {
+            user.parties = [push({
+                id: party._id,
+                isAdmin: false
+            })]
+        }
+        else {
+            var isAlready = false;
+            user.parties.forEach((item) => {
+                console.log(item.id)
+                console.log(party._id)
+                if (item.id.toString() == party._id.toString()) {
+                    console.log("is Already")
+                    isAlready = true
+                }
+            })
+            if (isAlready == false) {
+                console.log("new")
+                user.parties.push({
+                    id: party._id,
+                    isAdmin: false
+                })
+            }
+        }
+        user = await user.save();
+        res.send({ _id: party._id, partyName: party.name })
+    }
+    catch (err) {
+        return res.status(400).send("Unknown Error at Join")
+    }
+}
+)
 
 //Create a Party a valid user Id must exist
 router.post('/', async (req, res) => {
+    console.log("User: " + req.body._id + " tried to Create a Party")
     var user = await User.findById(req.body._id)
     var party = new Party({
         name: req.body.name,
@@ -45,7 +96,7 @@ router.post('/', async (req, res) => {
         user: req.body._id
     })
     party = await party.save()
-    //Make sure there is a party array
+    //Make sure there is a party array at User
     user.parties ? !null : user.parties = []
     user.parties.push({
         id: party._id,
@@ -54,7 +105,8 @@ router.post('/', async (req, res) => {
     user = await user.save()
 
     res.send({
-        playlist: party.playlist
+        _id: party._id,
+        partyName: party.name
     })
 }
 );
@@ -79,7 +131,7 @@ router.post('/vote', async (req, res) => {
             party.playlist = [first].concat(rest)
             party = await party.save();
             res.send(party.playlist) //
-            eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId:party._id })
+            eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId: party._id })
             return
         }
     }
@@ -92,7 +144,7 @@ router.post('/vote', async (req, res) => {
         votes: 1
     })
     await party.save()
-    eventBus.emit("voted", { socketId: party.socketId, playlist: party.playlist ,partyId:party._id })
+    eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId: party._id })
     res.send(party.playlist)
 })
 
@@ -115,7 +167,7 @@ router.get('/skip', async (req, res) => {
         const accessToken = await user.isAccessValid()
         console.log("Skipped")
         newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id) //We dont need to fire an event does it automatically
-        eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId:party._id })
+        eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId: party._id })
         return res.send(party.playlist[0])
     }
     return res.status(400) //Not sure if Status right
@@ -123,45 +175,50 @@ router.get('/skip', async (req, res) => {
 
 //Toggle
 router.get('/toggle', async (req, res) => {
-    var party = await Party.findById(req.query.partyId)
-    var user = await User.findById(party.user)
-    var accessToken = await user.isAccessValid()
-    //Not the right to Toogle
-    if (req.query._id != party.user) {
-        return res.status(401).send("You are not authorized to Toogle Playbak")
-    }
-
-    //All Good
-    var currentPlaying = await newSpotifyApi.getCurrentTrack(accessToken)
-
-    //No track to play
-    if (party.playlist.length == 0) return res.send("No Tracks to Play")
-
-    //No current Playback -> start Playback
-    if (currentPlaying == "") {
-        newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
-        return res.send("Started Song")
-    }
-    //There is current Playback
-
-    //First check if current Track matches first in que -> not play
-    if (currentPlaying.item.id != party.playlist[0].id) {
-        newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
-
-        return res.send("All Good")
-    }
-    //Else is pause -> play or isplaying -> pause
-    else {
-        if (currentPlaying.is_playing) {
-            newSpotifyApi.pause(accessToken, party.deviceId)
-            res.send("paused")
+    try {
+        var party = await Party.findById(req.query.partyId)
+        var user = await User.findById(party.user)
+        var accessToken = await user.isAccessValid()
+        //Not the right to Toogle
+        if (req.query._id != party.user) {
+            return res.status(401).send("You are not authorized to Toogle Playbak")
         }
+
+        //All Good
+        var currentPlaying = await newSpotifyApi.getCurrentTrack(accessToken)
+
+        //No track to play
+        if (party.playlist.length == 0) return res.send("No Tracks to Play")
+
+        //No current Playback -> start Playback
+        if (currentPlaying == "") {
+            newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
+            return res.send("Started Song")
+        }
+        //There is current Playback
+
+        //First check if current Track matches first in que -> not play
+        if (currentPlaying.item.id != party.playlist[0].id) {
+            newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
+
+            return res.send("All Good")
+        }
+        //Else is pause -> play or isplaying -> pause
         else {
-            newSpotifyApi.resume(accessToken, party.deviceId)
-            res.send("resumed")
+            if (currentPlaying.is_playing) {
+                newSpotifyApi.pause(accessToken, party.deviceId)
+                res.send("paused")
+            }
+            else {
+                newSpotifyApi.resume(accessToken, party.deviceId)
+                res.send("resumed")
+            }
         }
-    }
 
+    }
+    catch (err) {
+        res.send("Error Toggling").status(400)
+    }
 })
 //Returns Object of all the Parties from a user and if he is admin
 //Return all The Information about a Party

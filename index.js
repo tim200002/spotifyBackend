@@ -12,7 +12,8 @@ var socketFunctions = require('./socketFunctions')
 var SpotifyValidationRoutes = require('./routes/loginWithSpotify');
 var userRoutes = require('./routes/user');
 var searchRoutes = require('./routes/search');
-var partyRoutes = require('./routes/party')
+var partyRoutes = require('./routes/party');
+var webSdkRoutes=require('./routes/webSdk')
 //Important for Environmet Variables -> when not in Producation load important variables from file
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config();
@@ -31,6 +32,7 @@ app.use(express.json());
 app.use('/user', userRoutes);
 app.use('/search', searchRoutes);
 app.use('/party', partyRoutes);
+app.use('/webSDK', webSdkRoutes);
 app.use(SpotifyValidationRoutes);
 
 
@@ -51,7 +53,7 @@ websock = io.of('/webapp')
 //Webscoket Handling
 websock.on('connection', async (socket) => {
     var party = null
-    console.log("Connection")
+    console.log("Connection with WebSDK")
     //When a song is over or stopped
     var lastSongChange = Date.now()
     socket.on('player_state_changed', async (data) => {
