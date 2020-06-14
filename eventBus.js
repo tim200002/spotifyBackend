@@ -1,3 +1,5 @@
+//This is the Main Event Bus of this Application
+
 const EventEmitter = require('events');
 const emitter = new EventEmitter();
 

@@ -38,6 +38,8 @@ router.get('/', async (req, res) => {
         res.send(result)
     }
     catch (err) {
+        console.log("Error in Endpoint get (Party)")
+        console.log(err.message)
         res.status(400).send(err.message)
     }
 }
@@ -86,6 +88,8 @@ router.post("/join", async (req, res) => {
         res.send({ _id: party._id, partyName: party.name })
     }
     catch (err) {
+        console.log("Error in Endpoint post join")
+        console.log(err.message)
         return res.status(400).send(err.message)
     }
 }
@@ -116,6 +120,8 @@ router.post('/', async (req, res) => {
         })
     }
     catch (err) {
+        console.log("Error in Endpoint post (party)")
+        console.log(err.message)
         res.status(400).send(err.message)
     }
 }
@@ -157,6 +163,8 @@ router.post('/vote', async (req, res) => {
         res.send(party.playlist)
     }
     catch (err) {
+        console.log("Error in Endpoint post vote")
+        console.log(err.message)
         res.status(400).send(err.message)
     }
 })
@@ -189,6 +197,8 @@ router.get('/skip', async (req, res) => {
         return res.status(400).send("There are to few songs -> Skipping isn't valid") //Not sure if Status right
     }
     catch (err) {
+        console.log("Error in Endpoint get skip")
+        console.log(err.message)
         res.status(400).send(err.message)
     }
 })
@@ -239,7 +249,9 @@ router.get('/toggle', async (req, res) => {
 
     }
     catch (err) {
-        res.send("Error Toggling").status(400)
+        console.log("Error in Endpoint get toggle")
+        console.log(err.message)
+        res.send(err.message).status(400)
     }
 })
 
@@ -263,6 +275,8 @@ router.get('/myParties', async (req, res) => {
     res.send(subscribedParties)
 }
 catch(err){
+    console.log("Error in Endpoint get myParties")
+    console.log(err.message)
     res.status(400).send(err.message)
 }
 }
@@ -281,6 +295,8 @@ router.get('/accessToken', async (req, res) => {
     res.send({ accessToken: accessToken })
     }
     catch(err){
+        console.log("Error in Endpoint get accessToken")
+        console.log(err.message)
         res.status(400).send(err.message)
     }
 

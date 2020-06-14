@@ -1,5 +1,6 @@
 const axios = require('axios');
-const qs = require('querystring')
+const qs = require('querystring');
+const { resolve } = require('path');
 
 class NewSpotifyApi {
     constructor(clientID, clientSecretKey, redirectUri) {
@@ -40,6 +41,7 @@ class NewSpotifyApi {
                     resolve(dict);
                 })
                 .catch((err) => {
+                    console.log("Error in SpotifyAPI get AccessToken")
                     console.log(err.message);
                     reject("Error Getting Acces Token")
                 })
@@ -72,6 +74,7 @@ class NewSpotifyApi {
                     resolve({ "acces_token": accessToken, "issue_time": issueTime });
                 })
                 .catch((err) => {
+                    console.log("Error in SpotifyAPI refreshAccessToken")
                     console.log(err.message);
                     reject("Couldnt refresh the Access Token");
                 })
@@ -94,6 +97,7 @@ class NewSpotifyApi {
                     resolve(result);
                 })
                 .catch((err) => {
+                    console.log("Error in SpotifyAPI get getUserPlaylists")
                     console.log(err.message);
                     reject("Couldnt get Playlists");
                 })
@@ -117,18 +121,23 @@ class NewSpotifyApi {
         const userId = await this.getUserId(accessToken);
         return new Promise((resolve, reject) => {
 
-            this.getUserId((userId)=>{
+            this.getUserId((userId) => {
                 axios.post(`https://api.spotify.com/v1/users/${userId}/playlists`, reqBody, config)
-                .then((result) => {
-                    resolve(result.data);
+                    .then((result) => {
+                        resolve(result.data);
 
-                })
-                .catch((err) => {
-                    console.log(err.message);
-                    reject("Couldnt Create Playlist");
-                })
+                    })
+                    .catch((err) => {
+                        console.log("Error in SpotifyAPI get createPlaylist (inner Catch)")
+                        console.log(err.message);
+                        reject("Couldnt Create Playlist");
+                    })
             })
-            .catch(reject("Couldnt find User belonging to Accesstoken"))
+                .catch((err) => {
+                    console.log("Error in SpotifyAPI get AccessToken (outer Catch)")
+                    console.log(err.message)
+                    reject("Couldnt find User belonging to Accesstoken")
+                })
 
 
         }
@@ -149,6 +158,7 @@ class NewSpotifyApi {
                     resolve(result['data'].id);
                 })
                 .catch((err) => {
+                    console.log("Error in SpotifyAPI getUserId")
                     console.log(err.message);
                     reject("Couldnt get User Id");
                 })
@@ -177,6 +187,7 @@ class NewSpotifyApi {
                     resolve(result.data);
                 })
                 .catch((err) => {
+                    console.log("Error in SpotifyAPI search")
                     console.log(err.message)
                     reject("Couldnt Search the SPotify API");
                 })
@@ -205,6 +216,7 @@ class NewSpotifyApi {
                     resolve("Succes Playing Song")
                 })
                 .catch((err) => {
+                    console.log("Error in SpotifyAPI play")
                     console.log(err.message)
                     reject("Error Playing Song")
                 })
@@ -224,6 +236,7 @@ class NewSpotifyApi {
                 console.log("Succes Resuming Song")
             })
             .catch((err) => {
+                console.log("Error in SpotifyAPI resume")
                 console.log(err.message)
                 console.log("Error Resuming Song")
             })
@@ -236,14 +249,19 @@ class NewSpotifyApi {
             },
 
         }
-        //I belive no need for async
-        axios.put("https://api.spotify.com/v1/me/player/pause?device_id=" + deviceId, {}, config)
-            .then((result) => {
-                
-            })
-            .catch((err) => {
-                console.log(err.message)
-            })
+
+        //No Real Need for async i guess but this makes interface more equal
+        return new Promise((resolve, reject) => {
+            axios.put("https://api.spotify.com/v1/me/player/pause?device_id=" + deviceId, {}, config)
+                .then((result) => {
+                    resolve("Paused")
+                })
+                .catch((err) => {
+                    console.log("Error in SpotifyAPI pause")
+                    console.log(err.message)
+                    reject(err.message)
+                })
+        })
     }
 
     getCurrentTrack(accessToken) {
@@ -259,6 +277,8 @@ class NewSpotifyApi {
                     resolve(result.data)
                 })
                 .catch((err) => {
+                    console.log("Error in SpotifyAPI getCurrentTrack")
+                    console.log(err.message)
                     reject(err.message)
                 })
         })
