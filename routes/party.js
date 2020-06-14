@@ -10,6 +10,7 @@ const { User } = require('../models/user')
 
 const eventBus = require('../eventBus')
 
+//Create a Spotify API instance
 var NewSpotifyApi = require('../Classes/newSpotifyApi')
 var newSpotifyApi = new NewSpotifyApi(
     process.env.client_Id,
@@ -18,7 +19,7 @@ var newSpotifyApi = new NewSpotifyApi(
 )
 
 
-//Return all The Information about a Party
+//Return all the Songs from a Playlist
 router.get('/', async (req, res) => {
     try {
         var party = await Party.findById(req.query.partyId)
@@ -40,34 +41,39 @@ router.get('/', async (req, res) => {
         res.status(400).send(err.message)
     }
 }
-
 );
 
-//Join a Party
+//Join a Party -> PartyId gets stored in ones own party Array
 router.post("/join", async (req, res) => {
     try {
-        console.log("User wants to join a Party for the First Time")
         var party = await Party.findById(req.body.partyId)
         if (!party) return res.status(400).send("Couldnt find Party")
 
         var user = await User.findById(req.body._id)
         if (!user) return res.status(400).send("Couldnt find User")
+
+        //If there is no Party Array yet-> make Array and Push new
+        //!Code looks bad -> why push in Array
         if (user.parties == null) {
             user.parties = [push({
                 id: party._id,
                 isAdmin: false
             })]
         }
+        //Partyarray exitsts 
         else {
+
+            //Check if user already joined this Party
             var isAlready = false;
             user.parties.forEach((item) => {
                 console.log(item.id)
                 console.log(party._id)
                 if (item.id.toString() == party._id.toString()) {
-                    console.log("is Already")
                     isAlready = true
                 }
             })
+
+            //User didn't joined the Party yet-> add Party to User
             if (isAlready == false) {
                 console.log("new")
                 user.parties.push({
@@ -80,138 +86,154 @@ router.post("/join", async (req, res) => {
         res.send({ _id: party._id, partyName: party.name })
     }
     catch (err) {
-        return res.status(400).send("Unknown Error at Join")
+        return res.status(400).send(err.message)
     }
 }
 )
 
 //Create a Party a valid user Id must exist
 router.post('/', async (req, res) => {
-    console.log("User: " + req.body._id + " tried to Create a Party")
-    var user = await User.findById(req.body._id)
-    var party = new Party({
-        name: req.body.name,
-        //Create unique party Id later
-        Playlist: [],
-        user: req.body._id
-    })
-    party = await party.save()
-    //Make sure there is a party array at User
-    user.parties ? !null : user.parties = []
-    user.parties.push({
-        id: party._id,
-        isAdmin: true
-    })
-    user = await user.save()
+    try {
+        console.log("User: " + req.body._id + " tried to Create a Party")
+        var user = await User.findById(req.body._id)
+        var party = new Party({
+            name: req.body.name,
+            Playlist: [],
+            user: req.body._id
+        })
+        party = await party.save()
+        //Make sure there is a party array at User
+        user.parties ? !null : user.parties = []  //Check if usere has a Party Array
+        user.parties.push({
+            id: party._id,
+            isAdmin: true
+        })
+        user = await user.save()
 
-    res.send({
-        _id: party._id,
-        partyName: party.name
-    })
+        res.send({
+            _id: party._id,
+            partyName: party.name
+        })
+    }
+    catch (err) {
+        res.status(400).send(err.message)
+    }
 }
 );
 
 
-//Vote either new song or not
-//Sorts List after and returns sorted List
+//Vote for Song
 router.post('/vote', async (req, res) => {
-    console.log(req.body)
-    var party = await Party.findById(req.body.id)
-    if (!party) return res.status(400).send("Party not found")
-    //Does Playlist contain Song
-    for (var i = 0; i < party.playlist.length; i++) {
-        if (party.playlist[i].id == req.body.songId) {
-            party.playlist[i].votes++
-            //Sort
-            var first = party.playlist[0]
-            var rest = party.playlist.slice(1)
-            //Sort Rest:
-            rest.sort((a, b) => b.votes - a.votes)
-            console.log(rest)
-            party.playlist = [first].concat(rest)
-            party = await party.save();
-            res.send(party.playlist) //
-            eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId: party._id })
-            return
+    try {
+        var party = await Party.findById(req.body.id)
+        if (!party) return res.status(400).send("Party not found")
+        //Is the Song already in the Playlist -> then vote for the Song
+        for (var i = 0; i < party.playlist.length; i++) {
+            if (party.playlist[i].id == req.body.songId) {
+                party.playlist[i].votes++
+                //Sort
+                var first = party.playlist[0]
+                var rest = party.playlist.slice(1)
+                //Sort Rest:
+                rest.sort((a, b) => b.votes - a.votes)
+                console.log(rest)
+                party.playlist = [first].concat(rest)
+                party = await party.save();
+                res.send(party.playlist) //
+                eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId: party._id }) //notify all Listenes so Websocket updates all listening Sockets
+                return
+            }
         }
+        //Song not found in the Playlist -> add Song to Playlist
+        party.playlist.push({
+            id: req.body.songId,
+            artist: req.body.artist,
+            title: req.body.title,
+            albumArt: req.body.albumArt,
+            votes: 1
+        })
+        await party.save()
+        eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId: party._id }) //notify all Listenes so Websocket updates all listening Sockets
+        res.send(party.playlist)
     }
-    //Song not found add
-    party.playlist.push({
-        id: req.body.songId,
-        artist: req.body.artist,
-        title: req.body.title,
-        albumArt: req.body.albumArt,
-        votes: 1
-    })
-    await party.save()
-    eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId: party._id })
-    res.send(party.playlist)
+    catch (err) {
+        res.status(400).send(err.message)
+    }
 })
 
 
-//If user has right Skip to next Track
+//if User is creator of the Party he has the Right so Skip Songs
 router.get('/skip', async (req, res) => {
-    var party = await Party.findById(req.query.partyId)
-    //Not the right to skip
-    if (req.query._id != party.user) {
-        return res.status(401).send("You are not authorized to Skip a Track")
-    }
+    try {
+        var party = await Party.findById(req.query.partyId)
+        //is the user eligible to Skip
+        if (req.query._id != party.user) {
+            return res.status(401).send("User isn't eligible to Skip. Only creator of Party may Skip") //Not eleigible
+        }
 
-    //All Good
-    if (party.playlist != null && party.playlist.length > 0) {
-        party.playlist = party.playlist.slice(1)
-        party = await party.save();
-        //! Call Spotify Api to Skip by playing next song
-        const user = await User.findById(party.user)
-        console.log(user)
-        const accessToken = await user.isAccessValid()
-        console.log("Skipped")
-        newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id) //We dont need to fire an event does it automatically
-        eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId: party._id })
-        return res.send(party.playlist[0])
+        //User is elegible
+
+        //Is the Plaxlist long enough so skipping is valid -> alt least two Songs
+        //!Check if length>0 or length >1
+        if (party.playlist != null && party.playlist.length > 0) {
+            party.playlist = party.playlist.slice(1) //Delete first Song from Playlist
+            party = await party.save();
+            //Call Spotify Api to Skip by playing next song
+            const user = await User.findById(party.user)
+            const accessToken = await user.isAccessValid()
+            //! Maybe check if still Playlist at the End if not pause
+            newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id) //We dont need to fire an event does it automatically
+            eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId: party._id }) //Notifyl all listenes therefor notify all Websockets
+            return res.send(party.playlist[0])
+        }
+        return res.status(400).send("There are to few songs -> Skipping isn't valid") //Not sure if Status right
     }
-    return res.status(400) //Not sure if Status right
+    catch (err) {
+        res.status(400).send(err.message)
+    }
 })
 
-//Toggle
+//Toggle: Play->Pause and Pause->Play
 router.get('/toggle', async (req, res) => {
     try {
         var party = await Party.findById(req.query.partyId)
         var user = await User.findById(party.user)
         var accessToken = await user.isAccessValid()
-        //Not the right to Toogle
+        //Not the right to Toogle -> only Creator has the Rigth to Toggle
         if (req.query._id != party.user) {
-            return res.status(401).send("You are not authorized to Toogle Playbak")
+            return res.status(401).send("You are not authorized to Toogle Playback. Only the Creator has the right")
         }
 
-        //All Good
+        //Eligible to Toggle
         var currentPlaying = await newSpotifyApi.getCurrentTrack(accessToken)
 
-        //No track to play
-        if (party.playlist.length == 0) return res.send("No Tracks to Play")
+        //Playlist is empty -> no Tracks to play
+        if (party.playlist.length == 0) return res.send("Playlist is empty -> cant't toggle Playback")
 
-        //No current Playback -> start Playback
+        //No current Playback playing -> start Playback with first Song from Playlist
         if (currentPlaying == "") {
             newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
-            return res.send("Started Song")
+            return res.send("Started Playback")
         }
-        //There is current Playback
-
-        //First check if current Track matches first in que -> not play
+        //There is current Playback 
+        //First check if current Track matches first in playlist
         if (currentPlaying.item.id != party.playlist[0].id) {
+            //Wrong Song from another Session -> play Right Song
             newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
 
-            return res.send("All Good")
+            return res.send("Started Playback")
         }
-        //Else is pause -> play or isplaying -> pause
+        //Else Tracks matched therefore in right session
         else {
+            //Music Playing -> pause Music
             if (currentPlaying.is_playing) {
                 newSpotifyApi.pause(accessToken, party.deviceId)
-                res.send("paused")
+                res.send("Playback paused")
             }
+            //Music Paused -> play
             else {
                 newSpotifyApi.resume(accessToken, party.deviceId)
-                res.send("resumed")
+                res.send("Playback resumed")
             }
         }
 
@@ -220,12 +242,15 @@ router.get('/toggle', async (req, res) => {
         res.send("Error Toggling").status(400)
     }
 })
+
+
 //Returns Object of all the Parties from a user and if he is admin
-//Return all The Information about a Party
 router.get('/myParties', async (req, res) => {
-    console.log("User Aked for his Parties")
+    try{
     var user = await User.findById(req.query._id)
     if (!user) return res.status(401).send("User Not Found")
+
+    //Iterate over all Parties from a user to Return parties in slightly different format
     var subscribedParties = []
     for (var i = 0; i < user.parties.length; i++) {
         var party = await Party.findById(user.parties[i].id)
@@ -235,16 +260,29 @@ router.get('/myParties', async (req, res) => {
             partyId: user.parties[i].id
         })
     }
-    console.log(subscribedParties)
     res.send(subscribedParties)
+}
+catch(err){
+    res.status(400).send(err.message)
+}
 }
 );
 
+//Return the current acces Token beloning to a Party
+//Function is used to self validate the Web Playback SDK
+//!I believe this Function is only for the WebSDK therefore should be moved in the belonigng Route
 router.get('/accessToken', async (req, res) => {
+    try{
     var party = await Party.findById(req.query.partyId)
+    if(!party) return res.status(400).send("Couldn't find Party")
     var user = await User.findById(party.user)
-    var accessToken = await user.isAccessValid()
-    console.log("Acces Token" + accessToken)
+    if(!user) return res.send("Couldn't find user")
+    var accessToken = await user.isAccessValid() //Get the newest acces Token
     res.send({ accessToken: accessToken })
+    }
+    catch(err){
+        res.status(400).send(err.message)
+    }
+
 })
 module.exports = router
