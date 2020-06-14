@@ -41,7 +41,8 @@ app.use('/webSDK', webSdkRoutes);
 app.use(SpotifyValidationRoutes);
 
 
-//!Event Handles
+
+//!Event Handler
 //When voted in a party update all listeners
 eventBus.on("playlistUpdate", (data) => {
     console.log("voted" + data.socketId)
@@ -52,8 +53,8 @@ eventBus.on("playlistUpdate", (data) => {
 })
 
 //!Websockets
-//? one could mayber combine the different namespaces
-
+//? one could mayber combine the different namespaces -> but I personally like it like this
+ 
 //Namespace for all Socket Connections with the Webapp
 websock = io.of('/webapp')
 //Webscoket Handling
@@ -67,16 +68,15 @@ websock.on('connection', async (socket) => {
         //Decide if Song is over over when Time = 0000 and paused = true + Enought Time since last change
         if (data.position == 0 && data.paused == true && Date.now() - lastSongChange > 500) {
             lastSongChange = Date.now()
-            console.log("Track Ended")
             socketFunctions.skip(data.partyId)
             const party = await Party.findById(data.partyId)
             //When updated return list of all Songs back to Website so website can construct a live playlist
-            io.to(socket.id).emit("update", { queue: party.playlist })
+            //io.to(socket.id).emit("update", { queue: party.playlist }) //!Update happends automaticly in Skip by calling on the Event Bus
         }
         else if (data.position == 0 && data.paused == false && Date.now() - lastSongChange > 500) {
+            //!Is this part usefull for something
             lastSongChange = Date.now()
             console.log("Track Skipped")
-            //socketFunctions.skip(data.partyId)
         }
     });
 
