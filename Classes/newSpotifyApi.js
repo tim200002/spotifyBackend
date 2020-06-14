@@ -7,8 +7,10 @@ class NewSpotifyApi {
         this.clientSecretKey = clientSecretKey;
         this.redirectUri = redirectUri;
     }
-    //Function to Call to get Acces Token via auth Token from Login at Spotify
-    //Returns {"aces_token": value, "refresh_token": value, "issue_time": time.now()}
+
+
+    //Function to Call to get Access Token via auth Token from Login at Spotify
+    //Returns {"acess_token": value, "refresh_token": value, "issue_time": time.now()}
     getAccesToken(authToken) {
         const requestBody = {
             grant_type: "authorization_code",
@@ -32,14 +34,14 @@ class NewSpotifyApi {
                     const dict = {
                         "acces_token": this.accessToken,
                         "refresh_token": this.refreshToken,
-                        "issue_time": Date.now() ,
+                        "issue_time": Date.now(),
                     };
                     console.log("Authentification" + dict);
                     resolve(dict);
                 })
                 .catch((err) => {
                     console.log(err.message);
-                    reject("Error Authenticating with the API")
+                    reject("Error Getting Acces Token")
                 })
         })
     }
@@ -71,7 +73,7 @@ class NewSpotifyApi {
                 })
                 .catch((err) => {
                     console.log(err.message);
-                    reject("Couldnt refresh the token");
+                    reject("Couldnt refresh the Access Token");
                 })
         })
     }
@@ -84,7 +86,7 @@ class NewSpotifyApi {
                 'Authorization': "Bearer " + accessToken,
             }
         };
- 
+
 
         return new Promise((resolve, reject) => {
             axios.get("https://api.spotify.com/v1/me/playlists", config)
@@ -99,22 +101,24 @@ class NewSpotifyApi {
         );
     }
 
-    async createPlaylist(accessToken, PlaylistName){
-        console.log("Create Playlist");
+
+    async createPlaylist(accessToken, PlaylistName) {
         const config = {
             headers: {
                 'Content-Type': "application/json",
                 'Authorization': "Bearer " + accessToken,
             }
         };
-        const reqBody={
+        const reqBody = {
             name: PlaylistName,
             public: "false"
         };
         //Get Current user
-        const userId= await this.getUserId(accessToken);
+        const userId = await this.getUserId(accessToken);
         return new Promise((resolve, reject) => {
-            axios.post(`https://api.spotify.com/v1/users/${userId}/playlists`, reqBody, config)
+
+            this.getUserId((userId)=>{
+                axios.post(`https://api.spotify.com/v1/users/${userId}/playlists`, reqBody, config)
                 .then((result) => {
                     resolve(result.data);
 
@@ -123,12 +127,16 @@ class NewSpotifyApi {
                     console.log(err.message);
                     reject("Couldnt Create Playlist");
                 })
+            })
+            .catch(reject("Couldnt find User belonging to Accesstoken"))
+
+
         }
         );
     }
 
-    getUserId(accessToken){
-        console.log("Get ID");
+    //Get the User Id connected with the accessToken
+    getUserId(accessToken) {
         const config = {
             headers: {
                 'Authorization': "Bearer " + accessToken,
@@ -148,11 +156,10 @@ class NewSpotifyApi {
         );
     }
 
-    //!Search only Tracks
-    search(accessToken, query, queryType="track", limit=12){
-        console.log("Search");
+    //Search -> at the Moment Search only Tracks
+    search(accessToken, query, queryType = "track", limit = 12) {
         const config = {
-            params:{
+            params: {
                 q: query,
                 type: queryType,
                 limit: limit
@@ -162,102 +169,100 @@ class NewSpotifyApi {
                 'Authorization': "Bearer " + accessToken,
             }
         };
-        
-       
+
+
         return new Promise((resolve, reject) => {
             axios.get(`https://api.spotify.com/v1/search`, config)
                 .then((result) => {
                     resolve(result.data);
                 })
                 .catch((err) => {
-                    console.log(err.message);
-                    reject("Couldnt Search");
+                    console.log(err.message)
+                    reject("Couldnt Search the SPotify API");
                 })
         }
         );
     }
 
-    play(accessToken, deviceId, songId){
+
+    play(accessToken, deviceId, songId) {
         const config = {
-            headers:{
+            headers: {
                 'Authorization': "Bearer " + accessToken,
             },
-            params:{
+            params: {
                 device_id: deviceId
             }
         }
 
         const reqBody = {
-            uris:[`spotify:track:${songId}`]
+            uris: [`spotify:track:${songId}`]
         }
 
-        return new Promise((resolve, reject)=>{
+        return new Promise((resolve, reject) => {
             axios.put("https://api.spotify.com/v1/me/player/play", reqBody, config)
-            .then((result)=>{
-                resolve("Succes Playing Song")
-            })
-            .catch((err)=>{
-                console.log(err.message)
-                reject("Error Playing Song")
-            })
+                .then((result) => {
+                    resolve("Succes Playing Song")
+                })
+                .catch((err) => {
+                    console.log(err.message)
+                    reject("Error Playing Song")
+                })
         })
     }
-    resume(accessToken, deviceId){
+    resume(accessToken, deviceId) {
         const config = {
-            headers:{
+            headers: {
                 'Authorization': "Bearer " + accessToken,
             },
-            params:{
+            params: {
                 device_id: deviceId
             }
         }
-            axios.put("https://api.spotify.com/v1/me/player/play", {},config)
-            .then((result)=>{
+        axios.put("https://api.spotify.com/v1/me/player/play", {}, config)
+            .then((result) => {
                 console.log("Succes Resuming Song")
             })
-            .catch((err)=>{
+            .catch((err) => {
                 console.log(err.message)
                 console.log("Error Resuming Song")
             })
     }
 
-    pause(accessToken, deviceId){
+    pause(accessToken, deviceId) {
         const config = {
-            headers:{
+            headers: {
                 'Authorization': "Bearer " + accessToken,
             },
-    
+
         }
-
-        console.log(deviceId)
-
         //I belive no need for async
-        axios.put("https://api.spotify.com/v1/me/player/pause?device_id="+deviceId, {}, config)
-        .then((result)=>{
-            console.log("paused Track")
-        })
-        .catch((err)=>{
-            console.log("Error Pausing")
-        })
+        axios.put("https://api.spotify.com/v1/me/player/pause?device_id=" + deviceId, {}, config)
+            .then((result) => {
+                
+            })
+            .catch((err) => {
+                console.log(err.message)
+            })
     }
 
-    getCurrentTrack(accessToken){
-        const config ={
-            headers:{
+    getCurrentTrack(accessToken) {
+        const config = {
+            headers: {
                 'Authorization': "Bearer " + accessToken,
             },
         }
 
-        return new Promise((resolve, rejcet)=>{
+        return new Promise((resolve, rejcet) => {
             axios.get("https://api.spotify.com/v1/me/player/currently-playing", config)
-            .then((result)=>{
-                resolve(result.data)
-            })
-            .catch((err)=>{
-                reject("Couldnt get current Track")
-            })
+                .then((result) => {
+                    resolve(result.data)
+                })
+                .catch((err) => {
+                    reject(err.message)
+                })
         })
     }
 }
 
-module.exports =NewSpotifyApi;
+module.exports = NewSpotifyApi;
