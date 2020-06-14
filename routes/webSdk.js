@@ -7,6 +7,9 @@ var router = express.Router();
 const { Party } = require('../models/party')
 const { User } = require('../models/user')
 
+
+
+//Validate if party belonging to the ID exists
 router.get("/validate", async (req,res)=>{
     try {
         var party = await Party.findById(req.query.partyId)
@@ -14,6 +17,8 @@ router.get("/validate", async (req,res)=>{
         res.send(party)
     }
     catch (err) {
+        console.log("Error in Endpoint get validate (Web SDK)")
+        console.log(err.message)
         res.status(400).send(err.message)
     }
 })
