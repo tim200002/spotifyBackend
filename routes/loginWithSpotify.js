@@ -1,3 +1,5 @@
+//The Routes to validate at the Spotify Webn Page
+
 //Important for Environmet Variables -> when not in Production load important variables from file
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config();
@@ -24,7 +26,7 @@ router.get('/LoginSpotify',async (req,res)=>{
     if(!user) return res.status(401).send("User not valid")
     }
     catch(err){
-        return res.status(401).send("User not valid")
+        return res.status(401).send(err.message)
     }
     res.send({url: 'https://accounts.spotify.com/authorize' +
         '?response_type=code' +
@@ -36,6 +38,7 @@ router.get('/LoginSpotify',async (req,res)=>{
 
 //Route which is called after succesfull validation
 router.get('/callback', async (req, res) => {
+    try{
     const  authToken  = req.query.code;
     const state =req.query.state;
     const codes=await newSpotifyApi.getAccesToken(authToken);
@@ -47,19 +50,30 @@ router.get('/callback', async (req, res) => {
         issueTime: codes.issue_time
 
     }
-    var temp=await user.update(helper);
+    var temp=await user.update(helper);  
     console.log(codes);
     res.send("Go Back to the App");
+    }
+    catch(err){
+        res.status(400).send(err.message)
+    }
 })
 
+//Check if user is already validated at spotfiy
 router.get('/Spotify/isConnected',async (req,res)=>{
+
+    try{
     var user = await User.findById(req.query._id)
 
-    if(!user) return res.status(400).send("User not Foeund")
+    if(!user) return res.status(400).send("User not Foundd")
 
     if(user.refreshToken) return res.send({isConnected: true})
 
     return res.send({isConnected: false})
+    }
+    catch(err){
+        res.send(err.message)
+    }
 })
 
 module.exports = router
