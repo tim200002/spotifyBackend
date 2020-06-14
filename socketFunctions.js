@@ -1,4 +1,8 @@
 
+//These are Functions Called from within the Websocket
+//Not realy usefull -> no skipping in WebInterface
+
+
 //Important for Environmet Variables -> when not in Production load important variables from file
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config();

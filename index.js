@@ -1,5 +1,4 @@
 //Entry Poit for the Application
-
 var express = require('express');
 var app = express();
 const server = require('http').Server(app);
@@ -8,25 +7,31 @@ const mongoose = require('mongoose');
 var http = require('http');
 var { Party } = require('./models/party')
 var socketFunctions = require('./socketFunctions')
+
+
 //Require Routes
 var SpotifyValidationRoutes = require('./routes/loginWithSpotify');
 var userRoutes = require('./routes/user');
 var searchRoutes = require('./routes/search');
 var partyRoutes = require('./routes/party');
 var webSdkRoutes=require('./routes/webSdk')
+
+
 //Important for Environmet Variables -> when not in Producation load important variables from file
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config();
 }
 
+//Event Bus on which all Events are emitted
 var eventBus = require('./eventBus')
 
 
-
+//Connect to remote mongoose Server
 mongoose.connect('mongodb+srv://tim200002:' + process.env.database_Password + '@cluster0-jmtc0.mongodb.net/Jukebox?retryWrites=true&w=majority', { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => console.log("Connected to DB"))
     .catch(err => console.log("Error Connecting to DB"));
-var scopes = 'user-read-private user-read-email playlist-read-private';
+
+
 
 app.use(express.json());
 app.use('/user', userRoutes);
@@ -36,36 +41,35 @@ app.use('/webSDK', webSdkRoutes);
 app.use(SpotifyValidationRoutes);
 
 
-//!Event Handles which work directly with the io
+//!Event Handles
 //When voted in a party update all listeners
-//Later maybe a room could be ideal
 eventBus.on("playlistUpdate", (data) => {
     console.log("voted" + data.socketId)
     console.log("in room: "+data.partyId)
-    io.of('webapp').to(data.socketId).emit("update", { queue: data.playlist })
-    io.of("appsock").to(data.partyId).emit("update")
+    io.of('webapp').to(data.socketId).emit("update", { queue: data.playlist }) //Emit to the specifierd Webapp
+    io.of("appsock").to(data.partyId).emit("update") //Emit to all the APPs in the Party namespace
 
 })
 
-//!Namespace for all Socket Connections with the Webapp
-//!Todo Clean in Extra File
+//!Websockets
+//? one could mayber combine the different namespaces
+
+//Namespace for all Socket Connections with the Webapp
 websock = io.of('/webapp')
 //Webscoket Handling
 websock.on('connection', async (socket) => {
     var party = null
     console.log("Connection with WebSDK")
-    //When a song is over or stopped
+
+    //Time when the last SongChanged occured -> is important to recognize if state change is a song ending then we need to play the next Song
     var lastSongChange = Date.now()
     socket.on('player_state_changed', async (data) => {
-        console.log("state Changed")
-
-        //Decide if Song is over over when Time = 0000 and paused = true
+        //Decide if Song is over over when Time = 0000 and paused = true + Enought Time since last change
         if (data.position == 0 && data.paused == true && Date.now() - lastSongChange > 500) {
             lastSongChange = Date.now()
             console.log("Track Ended")
             socketFunctions.skip(data.partyId)
             const party = await Party.findById(data.partyId)
-            console.log("emit")
             //When updated return list of all Songs back to Website so website can construct a live playlist
             io.to(socket.id).emit("update", { queue: party.playlist })
         }
