@@ -20,7 +20,6 @@ var newSpotifyApi= new NewSpotifyApi(
 //Returns list of 10 Songs in the Format {artist, songId, title, albumArt}
 router.post('/', async(req,res)=>{
     try{
-        console.log(req.body)
         var party = await Party.findById(req.body.partyId)
         var user=await User.findById(party.user);
         if(!party || !user) return res.status(400).send("Party or User not found")

@@ -22,7 +22,6 @@ const scopes = 'user-modify-playback-state user-read-playback-state user-read-cu
 router.get('/LoginSpotify', async (req, res) => {
     try {
         var user = await User.findById(req.query._id)
-        console.log(user)
         if (!user) return res.status(401).send("User not valid")
 
         res.send({
@@ -57,7 +56,6 @@ router.get('/callback', async (req, res) => {
 
         }
         var temp = await user.update(helper);
-        console.log(codes);
         res.send("Go Back to the App");
     }
     catch (err) {

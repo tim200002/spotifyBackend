@@ -37,7 +37,6 @@ class NewSpotifyApi {
                         "refresh_token": this.refreshToken,
                         "issue_time": Date.now(),
                     };
-                    console.log("Authentification" + dict);
                     resolve(dict);
                 })
                 .catch((err) => {
@@ -83,7 +82,6 @@ class NewSpotifyApi {
 
     //!Functions to Interact with the API
     getUserPlaylists(accessToken) {
-        console.log("Get User Playlist");
         const config = {
             headers: {
                 'Authorization': "Bearer " + accessToken,
@@ -218,7 +216,7 @@ class NewSpotifyApi {
                 .catch((err) => {
                     console.log("Error in SpotifyAPI play")
                     console.log(err.message)
-                    reject("Error Playing Song")
+                    reject(err.message)
                 })
         })
     }
@@ -231,15 +229,21 @@ class NewSpotifyApi {
                 device_id: deviceId
             }
         }
-        axios.put("https://api.spotify.com/v1/me/player/play", {}, config)
+        //No Real Need for async i guess but this makes interface more equal
+        return new Promise((resolve,reject)=>{
+            axios.put("https://api.spotify.com/v1/me/player/play", {}, config)
             .then((result) => {
                 console.log("Succes Resuming Song")
+                resolve("Resumed")
             })
             .catch((err) => {
                 console.log("Error in SpotifyAPI resume")
                 console.log(err.message)
-                console.log("Error Resuming Song")
+                reject(err.message)
             })
+        })
+
+       
     }
 
     pause(accessToken, deviceId) {

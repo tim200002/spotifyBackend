@@ -24,7 +24,6 @@ router.get('/', async (req, res) => {
     try {
         var party = await Party.findById(req.query.partyId)
         if (!party) return res.status(400).send("Couldnt find Party")
-        console.log(party)
         var result = []
         party.playlist.forEach((item) => {
             result.push({
@@ -34,7 +33,6 @@ router.get('/', async (req, res) => {
                 albumArt: item.albumArt
             })
         })
-        //console.log(result)
         res.send(result)
     }
     catch (err) {
@@ -68,8 +66,6 @@ router.post("/join", async (req, res) => {
             //Check if user already joined this Party
             var isAlready = false;
             user.parties.forEach((item) => {
-                console.log(item.id)
-                console.log(party._id)
                 if (item.id.toString() == party._id.toString()) {
                     isAlready = true
                 }
@@ -77,7 +73,6 @@ router.post("/join", async (req, res) => {
 
             //User didn't joined the Party yet-> add Party to User
             if (isAlready == false) {
-                console.log("new")
                 user.parties.push({
                     id: party._id,
                     isAdmin: false
@@ -98,7 +93,6 @@ router.post("/join", async (req, res) => {
 //Create a Party a valid user Id must exist
 router.post('/', async (req, res) => {
     try {
-        console.log("User: " + req.body._id + " tried to Create a Party")
         var user = await User.findById(req.body._id)
         var party = new Party({
             name: req.body.name,
@@ -142,7 +136,6 @@ router.post('/vote', async (req, res) => {
                 var rest = party.playlist.slice(1)
                 //Sort Rest:
                 rest.sort((a, b) => b.votes - a.votes)
-                console.log(rest)
                 party.playlist = [first].concat(rest)
                 party = await party.save();
                 res.send(party.playlist) //
@@ -183,7 +176,7 @@ router.get('/skip', async (req, res) => {
 
         //Is the Plaxlist long enough so skipping is valid -> alt least two Songs
         //!Check if length>0 or length >1
-        if (party.playlist != null && party.playlist.length > 0) {
+        if (party.playlist != null && party.playlist.length > 1) {
             party.playlist = party.playlist.slice(1) //Delete first Song from Playlist
             party = await party.save();
             //Call Spotify Api to Skip by playing next song
@@ -222,28 +215,29 @@ router.get('/toggle', async (req, res) => {
 
         //No current Playback playing -> start Playback with first Song from Playlist
         if (currentPlaying == "") {
-            newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
+            await newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
+            
             return res.send("Started Playback")
         }
         //There is current Playback 
         //First check if current Track matches first in playlist
         if (currentPlaying.item.id != party.playlist[0].id) {
             //Wrong Song from another Session -> play Right Song
-            newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
-
+            await newSpotifyApi.play(accessToken, party.deviceId, party.playlist[0].id)
             return res.send("Started Playback")
         }
         //Else Tracks matched therefore in right session
         else {
             //Music Playing -> pause Music
             if (currentPlaying.is_playing) {
-                newSpotifyApi.pause(accessToken, party.deviceId)
+                await newSpotifyApi.pause(accessToken, party.deviceId)
                 res.send("Playback paused")
+                
             }
             //Music Paused -> play
             else {
-                newSpotifyApi.resume(accessToken, party.deviceId)
-                res.send("Playback resumed")
+                await newSpotifyApi.resume(accessToken, party.deviceId)
+                res.send("playback resumed")
             }
         }
 
@@ -251,7 +245,7 @@ router.get('/toggle', async (req, res) => {
     catch (err) {
         console.log("Error in Endpoint get toggle")
         console.log(err.message)
-        res.send(err.message).status(400)
+        res.status(400).send("Error in Endpoint get toggle")
     }
 })
 

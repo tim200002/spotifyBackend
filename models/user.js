@@ -48,7 +48,7 @@ userSchema.methods.isAccessValid = function () {
     return new Promise(async (resolve, reject) => {
         //New Token needed
         if ((Date.now() - this.issueTime) / 1000 > 3600) {
-            console.log("new");
+            console.log("new Access Token");
             const ret=await newSpotifyApi.refreshAccesToken(this.refreshToken);
             this.accessToken=ret.acces_token;
             this.issueTime=Date.now();
@@ -56,7 +56,6 @@ userSchema.methods.isAccessValid = function () {
             resolve(this.accessToken);
         }
         else{
-        console.log("still valid");
         resolve(this.accessToken); 
         }  
     });

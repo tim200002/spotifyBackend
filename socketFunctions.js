@@ -27,7 +27,7 @@ async skip(partyId){
     try{
     var party = await Party.findById(partyId)
     const user = await User.findById(party.user)
-    if(!party ||!user) throw("Couldnt fin Party or User")
+    if(!party ||!user) throw("Couldnt find Party or User")
     
     var accessToken = await user.isAccessValid()
     //Change Party Playlis

@@ -21,7 +21,11 @@ const PartyScheme =new mongoose.Schema({
             artist: String,
             title: String,
             albumArt: String,
-            votes: Number
+            votes: Number,
+            voters: [{
+                type: ObjectId,
+                ref:"User"
+            }],
         }]
     },
     user:{
