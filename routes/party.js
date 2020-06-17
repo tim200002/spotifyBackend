@@ -30,7 +30,8 @@ router.get('/', async (req, res) => {
                 artist: item.artist,
                 songId: item.id,
                 title: item.title,
-                albumArt: item.albumArt
+                albumArt: item.albumArt,
+                users: item.users,
             })
         })
         res.send(result)
@@ -97,7 +98,7 @@ router.post('/', async (req, res) => {
         var party = new Party({
             name: req.body.name,
             Playlist: [],
-            user: req.body._id
+            user: req.body._id,
         })
         party = await party.save()
         //Make sure there is a party array at User
@@ -127,10 +128,17 @@ router.post('/vote', async (req, res) => {
     try {
         var party = await Party.findById(req.body.id)
         if (!party) return res.status(400).send("Party not found")
+        var user = await User.findById(req.body.userId)
+        if(!user) return res.status(400).send("User not found")
         //Is the Song already in the Playlist -> then vote for the Song
         for (var i = 0; i < party.playlist.length; i++) {
             if (party.playlist[i].id == req.body.songId) {
                 party.playlist[i].votes++
+                //App should check if user already voted
+                //Nevertheless here again check;
+                if(!party.playlist[i].voters.include(user._id)){
+                    party.playlist[i].voters.push(user._id)
+                }
                 //Sort
                 var first = party.playlist[0]
                 var rest = party.playlist.slice(1)
@@ -149,7 +157,8 @@ router.post('/vote', async (req, res) => {
             artist: req.body.artist,
             title: req.body.title,
             albumArt: req.body.albumArt,
-            votes: 1
+            votes: 1,
+            users:[user._id]
         })
         await party.save()
         eventBus.emit("playlistUpdate", { socketId: party.socketId, playlist: party.playlist, partyId: party._id }) //notify all Listenes so Websocket updates all listening Sockets
